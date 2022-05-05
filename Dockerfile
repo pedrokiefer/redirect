@@ -1,6 +1,5 @@
 FROM scratch
 COPY redirect /bin/
-RUN mkdir /ui
 COPY ./ui /ui
 EXPOSE 10100
 EXPOSE 10101

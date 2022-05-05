@@ -27,6 +27,8 @@ dockers:
       - --label=org.opencontainers.image.title={{.ProjectName}}
       - --label=org.opencontainers.image.revision={{.FullCommit}}
       - --label=org.opencontainers.image.version={{.Version}}
+    extra_files:
+      - ui
   - image_templates:
       - "ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-arm64v8"
     goarch: arm64
@@ -38,6 +40,8 @@ dockers:
       - --label=org.opencontainers.image.title={{.ProjectName}}
       - --label=org.opencontainers.image.revision={{.FullCommit}}
       - --label=org.opencontainers.image.version={{.Version}}
+    extra_files:
+      - ui
 
 docker_manifests:
   - name_template: ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}
