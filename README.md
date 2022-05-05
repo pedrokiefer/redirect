@@ -91,10 +91,10 @@ with [http request](https://golang.org/pkg/net/http/#Request) as environment.
 
 #### Simple example
 
-* `service` = google
+* `service` = test
 * `template` = http://google.com
 
-All requests to http://127.0.0.1:10100/google will be redirected to http://google.com
+All requests to http://test will be redirected to http://google.com
 
 #### Complex example
 
@@ -103,12 +103,12 @@ All requests to http://127.0.0.1:10100/google will be redirected to http://googl
 
     https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/{{.URL.Query.Get "q"}}
 
-All requests to http://127.0.0.1:10100/mdn?q=QUERY will be redirected to
+All requests to http://mdn will be redirected to
 https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/QUERY
 
 E.x.:
 
-`http://127.0.0.1:10100/mdn?q=encodeuricomponent` maps to
+`http://mdn/?q=encodeuricomponent` maps to
 `https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/encodeuricomponent`
 
 * Endpoint:  `http://ui-addr/api/`

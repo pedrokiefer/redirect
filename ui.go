@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -16,6 +17,8 @@ const (
 
 //go:embed ui/*
 var defaultStaticUI embed.FS // nolint:gochecknoglobals
+
+var stripProtocol = regexp.MustCompile(`^(?:https?://)`)
 
 // Get default UI static files (prefixed by ui/).
 func DefaultUIStatic() embed.FS {
@@ -142,9 +145,11 @@ func (ui *basicUI) set(wr http.ResponseWriter, rq *http.Request) {
 		entry.Target = rq.FormValue(formFieldTarget)
 		entry.IsTemplate = strings.ToLower(rq.FormValue(formFieldIsTemplate)) == "true"
 	}
+	url := stripProtocol.ReplaceAllString(entry.URL, "")
+	target := stripProtocol.ReplaceAllString(entry.Target, "")
 	r := Rule{
-		URL:        entry.URL,
-		Target:     entry.Target,
+		URL:        url,
+		Target:     target,
 		IsTemplate: entry.IsTemplate,
 	}
 	if err := ui.storage.Set(r); err != nil {

@@ -104,6 +104,7 @@
 </body>
 <script>
   var appModule = angular.module("appModule", []);
+  var stripProtocol = /^https?:\/\//gi;
   appModule.controller("mainController", ["$scope", "$http", "$interval", function($scope, $http, $interval) {
     $http.defaults.headers.post["Content-Type"] = "application/x-www-form-urlencoded";
     $scope.services = {};
@@ -118,8 +119,8 @@
     }
     $scope.add = function(service, target, isTemplate) {
       var params = {
-        url: service,
-        target,
+        url: service.replace(stripProtocol, ''),
+        target: target.replace(stripProtocol, ''),
         isTemplate
       };
       $http.post('/api/', params, {'headers':{
