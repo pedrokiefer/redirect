@@ -11,42 +11,36 @@
       <tr>
         <th>Service</th>
         <th>Hits</th>
-        <th>Local URL</th>
-        <th>URL template</th>
+        <th>Target URL</th>
       </tr>
     </thead>
     <tbody>
-      <tr ng-repeat="(service, template) in services">
+      <tr ng-repeat="(service, rule) in services">
         <td>
           <a href="http://{{host}}:{{redirectPort}}/{{service}}">
             {{service}}
           </a>
         </td>
-        <td>{{template.hits}}</td>
+        <td>{{rule.hits}}</td>
         <td>
-          <a href="http://{{host}}:{{redirectPort}}/{{service}}">
-            http://{{host}}:{{redirectPort}}/{{service}}
-          </a>
-        </td>
-        <td>
-          <div class="form-group">
-            <div class="input-group">
+          <form class="form">
+            <div class="form-group" style="width:100%">
               <input type="text"
                 placeholder="Target URL template"
-                name="template"
+                name="target"
                 class="form-control"
-                ng-model="services[service].template" />
-
-              <span class="input-group-btn">
-                <button ng-click="add(service, services[service].template)"
-                  class="btn btn-info">Update</a>
-              </span>
-              <span class="input-group-btn">
-                <button ng-click="remove(service)"
-                  class="btn btn-danger">Remove</a>
-              </span>
+                ng-model="services[service].target" />
             </div>
-          </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" name="isTemplate" value="{{rule.isTemplate}}"
+              ng-model="services[service].isTemplate">
+              <label class="form-check-label" for="isTemplate">Is template?</label>
+            </div>
+            <button ng-click="add(service, services[service].target, services[service].isTemplate)"
+              class="btn btn-info pull-right">Update</a>
+            <button ng-click="remove(service)"
+              class="btn btn-danger pull-right">Remove</a>
+          </form>
         </td>
       </tr>
     </tbody>
@@ -86,13 +80,22 @@
             <span class="help-block">All functions from Go text/template can be used with environment as http.Request</span>
           </div>
         </div>
+        <div class="form-group row">
+          <label class="col-lg-2 control-label">Is Template?</label>
+          <div class="col-lg-10">
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" name="isTemplate"
+              ng-model="newIsTemplate">
+            </div>
+          </div>
+        </div>
         <div class="form-group">
           <div class="col-lg-10 col-lg-offset-2">
             <button type="reset"
               class="btn btn-default">Cancel</button>
             <button
               type="button"
-              class="btn btn-success" ng-click="add(newService, newTemplate)">Add</button>
+              class="btn btn-success" ng-click="add(newService, newTemplate, newIsTemplate)">Add</button>
           </div>
         </div>
       </fieldset>
@@ -113,18 +116,15 @@
           $scope.services = response.data;
         });
     }
-    $scope.add = function(service, template) {
-      var params = [{
-        name: 'service',
-        value: service
-      }, {
-        name: 'template',
-        value: template
-      }];
-      var query = params.map(function(pair) {
-        return encodeURIComponent(pair.name) + '=' + encodeURIComponent(pair.value)
-      }).join('&');
-      $http.post('/api/', query)
+    $scope.add = function(service, target, isTemplate) {
+      var params = {
+        url: service,
+        target,
+        isTemplate
+      };
+      $http.post('/api/', params, {'headers':{
+        'Content-Type': 'application/json'
+      }})
         .then(function(response) {
           $scope.update();
         }, function(response) {
@@ -140,7 +140,6 @@
         });
     }
     $scope.update();
-    $interval($scope.update, 3000);
   }]);
 </script>
 

@@ -1,4 +1,4 @@
-project_name: "redirect-to"
+project_name: "redirect"
 builds:
   - binary: redirect
     main: cmd/redirect/main.go
@@ -8,7 +8,6 @@ builds:
       - linux
     goarch:
       - amd64
-      - 386
       - arm64
     env:
       - CGO_ENABLED=0
@@ -19,40 +18,40 @@ archives:
         format: zip
 dockers:
   - image_templates:
-      - "reddec/redirect:latest"
-      - "reddec/redirect:{{ .Tag }}"
-      - "reddec/redirect:v{{ .Major }}"
+      - "ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-amd64"
+    dockerfile: Dockerfile
+    use: buildx
     build_flag_templates:
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-snapcrafts:
-  - name: redirect-to
-    publish: true
-    summary: Simple, very fast, in a single binary, with web UI HTTP redirect service
-    description: |
-      Simple, very fast, in a single binary, with web UI HTTP redirect service.
-      Contains embedded UI that allows you check add/update/remove rules online and
-      check how many hits you rules collected
-    grade: stable
-    confinement: strict
-    license: MIT
-    apps:
-      redirect-to:
-        plugs: ['network-bind']
-        command: redirect
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+  - image_templates:
+      - "ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-arm64v8"
+    goarch: arm64
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/arm64/v8
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+
+docker_manifests:
+  - name_template: ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}
+    image_templates:
+      - ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-arm64v8
+  - name_template: ghcr.io/pedrokiefer/{{ .ProjectName }}:latest
+    image_templates:
+      - ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/pedrokiefer/{{ .ProjectName }}:{{ .Version }}-arm64v8
 
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-nfpms:
-  - homepage: https://github.com/reddec/redirect
-    description: Simple, very fast, in a single binary, with web UI HTTP redirect service
-    maintainer: RedDec <owner@reddec.net>
-    license: MIT
-    formats:
-      - deb
+      - "^docs:"
+      - "^test:"

@@ -3,18 +3,24 @@ package redirect
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"text/template"
+
+	"github.com/sirupsen/logrus"
 )
+
+type redirect struct {
+	t      *template.Template
+	target string
+}
 
 type engine struct {
 	storage Storage
 	stat    StatWriter
 	lock    sync.RWMutex
-	rules   map[string]*template.Template
+	rules   map[string]redirect
 }
 
 // Create default engine based on provided storage and sink.
@@ -34,11 +40,11 @@ func DefaultEngine(storage Storage, sink StatWriter) Engine {
 func (eng *engine) ServeHTTP(wr http.ResponseWriter, rq *http.Request) {
 	defer rq.Body.Close()
 
-	service := strings.Trim(rq.URL.Path, "/")
+	service := rq.Host
 
 	// try to find redirect rule
 	eng.lock.RLock()
-	tpl, ok := eng.rules[service]
+	r, ok := eng.rules[service]
 	eng.lock.RUnlock()
 	if !ok {
 		http.NotFound(wr, rq)
@@ -47,24 +53,23 @@ func (eng *engine) ServeHTTP(wr http.ResponseWriter, rq *http.Request) {
 	// notify stat counter
 	eng.stat.Touch(service)
 
-	// render redirect template
-	urlData := &bytes.Buffer{}
-	err := tpl.Execute(urlData, rq)
-	if err != nil {
-		log.Println("engine: failed execute template for service", service, ":", err)
-		http.Error(wr, err.Error(), http.StatusInternalServerError)
-		return
+	url := r.target
+	if r.t != nil {
+		// render redirect template
+		urlData := &bytes.Buffer{}
+		err := r.t.Execute(urlData, rq)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"service": service,
+			}).Error("failed execute template for service", err)
+			http.Error(wr, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		url = strings.TrimSpace(urlData.String())
 	}
-	url := strings.TrimSpace(urlData.String())
 
-	// We send TARGET in Location header on HEAD request with 200 OK status
-	if rq.Method == "HEAD" {
-		wr.Header().Add("Location", url)
-		wr.WriteHeader(http.StatusOK)
-		return
-	}
 	wr.Header().Add("Content-Length", "0")
-	http.Redirect(wr, rq, url, http.StatusFound)
+	http.Redirect(wr, rq, "https://"+url, http.StatusMovedPermanently)
 }
 
 func (eng *engine) Reload() error {
@@ -72,13 +77,19 @@ func (eng *engine) Reload() error {
 	if err != nil {
 		return fmt.Errorf("engine: read rules from storage: %w", err)
 	}
-	var swap = make(map[string]*template.Template)
+	var swap = make(map[string]redirect, len(rules))
 	for _, rule := range rules {
-		t, err := template.New("").Parse(rule.LocationTemplate)
-		if err != nil {
-			return fmt.Errorf("engine: parse rule for url %v: %w", rule.URL, err)
+		var tpl *template.Template
+		if rule.IsTemplate {
+			tpl, err = template.New("").Parse(rule.Target)
+			if err != nil {
+				return fmt.Errorf("engine: parse rule for url %v: %w", rule.URL, err)
+			}
 		}
-		swap[rule.URL] = t
+		swap[rule.URL] = redirect{
+			t:      tpl,
+			target: rule.Target,
+		}
 	}
 	eng.lock.Lock()
 	eng.rules = swap

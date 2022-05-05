@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	formFieldTemplate = "template"
-	formFieldService  = "service"
-	headerRedirPort   = "X-Redir-Port"
+	formFieldTarget     = "target"
+	formFieldIsTemplate = "is_template"
+	formFieldService    = "service"
+	headerRedirPort     = "X-Redir-Port"
 )
 
 //go:embed ui/*
@@ -23,9 +24,10 @@ func DefaultUIStatic() embed.FS {
 
 // description of rule for API request.
 type UIEntry struct {
-	Template string `json:"template"`
-	Hits     int64  `json:"hits"`
-	URL      string `json:"url"`
+	Target     string `json:"target"`
+	Hits       int64  `json:"hits"`
+	URL        string `json:"url"`
+	IsTemplate bool   `json:"isTemplate"`
 }
 
 type basicUI struct {
@@ -81,9 +83,10 @@ func (ui *basicUI) list(wr http.ResponseWriter, _ *http.Request) {
 	}
 	for _, elem := range entries {
 		ans[elem.URL] = &UIEntry{
-			URL:      elem.URL,
-			Template: elem.LocationTemplate,
-			Hits:     ui.stats.Visits(elem.URL),
+			URL:        elem.URL,
+			Target:     elem.Target,
+			IsTemplate: elem.IsTemplate,
+			Hits:       ui.stats.Visits(elem.URL),
 		}
 	}
 	wr.Header().Set(headerRedirPort, ui.redirPort)
@@ -91,16 +94,17 @@ func (ui *basicUI) list(wr http.ResponseWriter, _ *http.Request) {
 }
 
 func (ui *basicUI) get(service string, wr http.ResponseWriter, rq *http.Request) {
-	template, exists := ui.storage.Get(service)
+	rule, exists := ui.storage.Get(service)
 	if !exists {
 		http.NotFound(wr, rq)
 		return
 	}
 	wr.Header().Set(headerRedirPort, ui.redirPort)
 	sendJSON(&UIEntry{
-		URL:      service,
-		Hits:     ui.stats.Visits(service),
-		Template: template,
+		URL:        service,
+		Hits:       ui.stats.Visits(service),
+		Target:     rule.Target,
+		IsTemplate: rule.IsTemplate,
 	}, wr)
 }
 
@@ -135,15 +139,19 @@ func (ui *basicUI) set(wr http.ResponseWriter, rq *http.Request) {
 			return
 		}
 		entry.URL = rq.FormValue(formFieldService)
-		entry.Template = rq.FormValue(formFieldTemplate)
+		entry.Target = rq.FormValue(formFieldTarget)
+		entry.IsTemplate = strings.ToLower(rq.FormValue(formFieldIsTemplate)) == "true"
 	}
-	err := ui.storage.Set(entry.URL, entry.Template)
-	if err != nil {
+	r := Rule{
+		URL:        entry.URL,
+		Target:     entry.Target,
+		IsTemplate: entry.IsTemplate,
+	}
+	if err := ui.storage.Set(r); err != nil {
 		http.Error(wr, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = ui.engine.Reload()
-	if err != nil {
+	if err := ui.engine.Reload(); err != nil {
 		http.Error(wr, err.Error(), http.StatusInternalServerError)
 		return
 	}

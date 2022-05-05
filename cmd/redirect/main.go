@@ -3,17 +3,20 @@ package main
 import (
 	_ "embed"
 	"flag"
-	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/reddec/redirect"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	uiFolder := flag.String("ui", "", "Location of custom UI files")
+	runUI := flag.Bool("ui", false, "run ui")
+	uiFolder := flag.String("ui-files", "", "Location of custom UI files")
 	uiAddr := flag.String("ui-addr", "127.0.0.1:10101", "Address for UI")
 	configFile := flag.String("config", "./redir.json", "File to save configs")
+	pollInterval := flag.String("poll", "5s", "Polling interval")
 	bind := flag.String("bind", "0.0.0.0:10100", "Redirect address")
 	flag.Parse()
 
@@ -23,24 +26,55 @@ func main() {
 	// init defaults
 	stats := redirect.InMemoryStats()
 	storage := &redirect.JSONStorage{FileName: *configFile}
-	engine := redirect.DefaultEngine(storage, stats)
-	ui := redirect.DefaultUI(storage, stats, engine, port)
-
-	go func() {
-		panic(http.ListenAndServe(*bind, engine))
-	}()
-
-	static := http.FileServer(http.FS(redirect.DefaultUIStatic()))
-	if *uiFolder != "" {
-		static = http.FileServer(http.Dir(*uiFolder))
+	if err := storage.Reload(); err != nil {
+		logrus.Fatal(err)
 	}
-	http.Handle("/ui/", static)
-	http.Handle("/api/", http.StripPrefix("/api/", ui))
+
+	engine := redirect.DefaultEngine(storage, stats)
+	if err := engine.Reload(); err != nil {
+		logrus.Fatal(err)
+	}
+
+	interval, err := time.ParseDuration(*pollInterval)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	watcher := redirect.NewWatcher(interval)
+	watcher.AddFile(*configFile, func() {
+		if err := storage.Reload(); err != nil {
+			logrus.Warning("failed to reload config: %s", err)
+			return
+		}
+
+		if err := engine.Reload(); err != nil {
+			logrus.Warning("failed to reload engine: %s", err)
+			return
+		}
+		logrus.Info("config reloaded")
+	})
+	watcher.Watch()
+
+	if *runUI {
+		ui := redirect.DefaultUI(storage, stats, engine, port)
+		go startUI(*uiAddr, *uiFolder, ui)
+	}
+
+	logrus.Info("Bind:", *bind)
+	panic(http.ListenAndServe(*bind, redirect.WithLogging(engine)))
+}
+
+func startUI(uiAddr string, uiFolder string, ui http.Handler) {
+	static := http.FileServer(http.FS(redirect.DefaultUIStatic()))
+	if uiFolder != "" {
+		static = http.FileServer(http.Dir(uiFolder))
+	}
+	http.Handle("/ui/", redirect.WithLogging(static))
+	http.Handle("/api/", redirect.WithLogging(http.StripPrefix("/api/", ui)))
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		// redirect to ui
 		http.Redirect(writer, request, "ui/", http.StatusTemporaryRedirect)
 	})
-	log.Println("UI:", *uiAddr)
-	log.Println("Bind:", *bind)
-	panic(http.ListenAndServe(*uiAddr, nil))
+	logrus.Info("UI:", uiAddr)
+	panic(http.ListenAndServe(uiAddr, nil))
 }

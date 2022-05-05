@@ -26,15 +26,16 @@ type Stats interface {
 
 // Single rule for redirection.
 type Rule struct {
-	URL              string // Matching URL (aka service name)
-	LocationTemplate string // Go-Template of target location
+	URL        string // Matching URL (aka service name)
+	Target     string // Go-Template of target location
+	IsTemplate bool   // Is target a go-template?
 }
 
 // Rules storage type.
 type Storage interface {
-	Set(url string, locationTemplate string) error // add or replace rule
-	Get(url string) (string, bool)                 // get location template. should return true if exists
-	Remove(url string) error                       // remove rule (or ignore if not exists)
-	All() ([]*Rule, error)                         // dump all save rules
-	Reload() error                                 // reload storage and fill the internal cache
+	Set(r Rule) error            // add or replace rule
+	Get(url string) (Rule, bool) // get location template. should return true if exists
+	Remove(url string) error     // remove rule (or ignore if not exists)
+	All() ([]*Rule, error)       // dump all save rules
+	Reload() error               // reload storage and fill the internal cache
 }
